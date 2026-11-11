@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { EventEmitter } from 'events'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 
 function resolveKiroCli(): string {
@@ -120,7 +121,7 @@ export class HeadlessClient extends EventEmitter {
 
   // Sobe um processo kiro-cli em segundo plano enquanto o usuário lê a resposta
   private _preWarm() {
-    if (this.warmProc || this.status !== 'ready') return
+    if (this.warmProc || this.status !== 'ready' || !this.cwd) return
     this._emitLog('info', 'Pre-warming kiro-cli...')
     const proc = spawn(resolveKiroCli(), this._baseArgs(), {
       cwd: this.cwd, env: this._env(), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true,
@@ -204,7 +205,7 @@ export class HeadlessClient extends EventEmitter {
       const proc = spawn(
         resolveKiroCli(),
         ['chat', '--no-interactive', '--output-format', 'stream-json', '--agent-engine', 'v2'],
-        { cwd: this.cwd || process.cwd(), env: this._env(), stdio: ['pipe', 'pipe', 'ignore'] },
+        { cwd: this.cwd || os.homedir(), env: this._env(), stdio: ['pipe', 'pipe', 'ignore'] },
       )
 
       this._emitLog('info', 'fetchUsage: processo kiro-cli iniciado')
