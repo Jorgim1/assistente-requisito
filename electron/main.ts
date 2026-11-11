@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import os from 'os'
 import { fileURLToPath } from 'url'
 import { autoUpdater } from 'electron-updater'
 import { HeadlessClient } from './headless-client.js'
@@ -78,7 +77,7 @@ function createWindow(): BrowserWindow {
     win.show()
     if (cfg.selectedModel) client.currentModel = cfg.selectedModel
     const workspacePath = await getWorkspacePath()
-    client.connect(workspacePath ?? os.homedir(), cfg.kiroApiKey)
+    if (workspacePath) client.connect(workspacePath, cfg.kiroApiKey)
   })
 
   win.on('closed', () => {
@@ -174,7 +173,7 @@ ipcMain.handle('win:new-window', () => { createWindow() })
 // ── Headless client via IPC ───────────────────────────────────────
 ipcMain.on('acp:connect', async (e, cwd: string) => {
   const cfg = await readConfig()
-  clientFor(e)?.connect(cwd || os.homedir(), cfg.kiroApiKey)
+  if (cwd) clientFor(e)?.connect(cwd, cfg.kiroApiKey)
 })
 ipcMain.on('acp:prompt',        (e, text: string) => clientFor(e)?.sendPrompt(text))
 ipcMain.on('acp:cancel',           (e) => clientFor(e)?.cancel())
@@ -268,7 +267,8 @@ ipcMain.handle('config:set', async (_, cfg: { kiroApiKey?: string; proxyUrl?: st
   await applyProxy(cfg.proxyUrl || undefined)
   for (const client of clients.values()) {
     client.disconnect()
-    client.connect(client.getCwd() || os.homedir(), cfg.kiroApiKey)
+    const cwd = client.getCwd()
+    if (cwd) client.connect(cwd, cfg.kiroApiKey)
   }
 })
 

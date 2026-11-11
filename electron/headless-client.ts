@@ -2,7 +2,6 @@ import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { EventEmitter } from 'events'
 import fs from 'fs'
-import os from 'os'
 import path from 'path'
 
 function resolveKiroCli(): string {
@@ -205,7 +204,7 @@ export class HeadlessClient extends EventEmitter {
       const proc = spawn(
         resolveKiroCli(),
         ['chat', '--no-interactive', '--output-format', 'stream-json', '--agent-engine', 'v2'],
-        { cwd: this.cwd || os.homedir(), env: this._env(), stdio: ['pipe', 'pipe', 'ignore'] },
+        { cwd: this.cwd || undefined, env: this._env(), stdio: ['pipe', 'pipe', 'ignore'] },
       )
 
       this._emitLog('info', 'fetchUsage: processo kiro-cli iniciado')
