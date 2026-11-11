@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import MarkdownRenderer from './MarkdownRenderer'
-import type { Artifact, AgentUpdate } from '../electron'
+import type { Artifact, AgentUpdate, Project } from '../electron'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -13,8 +13,9 @@ interface Props {
   width: number
   onWidthChange: (w: number) => void
   activeArtifact: Artifact | null
-  selectedArtifacts: Artifact[]       // artifacts checked in sidebar
+  selectedArtifacts: Artifact[]
   onProcessingChange?: (v: boolean) => void
+  activeProject?: Project | null
 }
 
 export default function GlobalChatPanel({
@@ -24,6 +25,7 @@ export default function GlobalChatPanel({
   activeArtifact,
   selectedArtifacts,
   onProcessingChange,
+  activeProject,
 }: Props) {
   const [messages, setMessages]   = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
@@ -79,6 +81,11 @@ export default function GlobalChatPanel({
 
     // Carrega conteúdo dos artefatos de contexto
     const api = window.electronAPI
+    const metaParts: string[] = []
+
+    if (activeProject?.name) metaParts.push(`Projeto: ${activeProject.name}`)
+    if (activeProject?.gitlabProjectPath) metaParts.push(`GitLab: ${activeProject.gitlabProjectPath}`)
+
     let contextBlock = ''
     if (api && contextArtifacts.length > 0) {
       const parts: string[] = []
@@ -91,7 +98,8 @@ export default function GlobalChatPanel({
       }
     }
 
-    const prompt = contextBlock + text
+    const metaBlock = metaParts.length > 0 ? metaParts.join('\n') + '\n\n' : ''
+    const prompt = metaBlock + contextBlock + text
     setMessages((prev) => [
       ...prev,
       { role: 'user',      content: text },

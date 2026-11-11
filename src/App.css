@@ -4312,7 +4312,7 @@ html, body, #root { height: 100%; overflow: hidden; }
   font-size: 12px;
   line-height: 1.6;
 }
-.gchat-msg { }
+.gchat-msg { margin-bottom: 2px; }
 .gchat-msg-user {
   display: flex;
   justify-content: flex-end;
@@ -4336,6 +4336,10 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .gchat-ai { font-size: 12px; }
 .gchat-ai .markdown-body { font-size: 12px; }
+.gchat-ai .markdown-body p { margin: 0 0 8px; }
+.gchat-ai .markdown-body p:last-child { margin-bottom: 0; }
+.gchat-ai .markdown-body ul, .gchat-ai .markdown-body ol { margin: 0 0 8px; padding-left: 18px; }
+.gchat-ai .markdown-body li { margin-bottom: 2px; }
 
 .gchat-input-row {
   display: flex;

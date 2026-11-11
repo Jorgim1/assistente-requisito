@@ -474,6 +474,7 @@ export default function App() {
               activeArtifact={activeArtifact}
               selectedArtifacts={selectedArtifacts}
               onProcessingChange={setIsProcessing}
+              activeProject={activeProject}
             />
           </>
         )}
