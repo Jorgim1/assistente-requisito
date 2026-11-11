@@ -1,0 +1,39 @@
+# Dependências
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+out/
+
+# Instaladores e release
+release/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Variáveis de ambiente / segredos
+.env
+.env.local
+.env*.local
+
+# Dados gerados pelo kiro-cli (relatórios, sessões, steering runtime)
+.kiro/readiness/
+.kiro/sessions/
+.kiro/steering/
+
+# Config local do Claude Code
+.claude/
+
+# Script avulso não relacionado ao app
+analise_orcamento/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.suo
+*.user
