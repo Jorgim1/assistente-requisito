@@ -4335,6 +4335,13 @@ html, body, #root { height: 100%; overflow: hidden; }
   background: var(--white);
 }
 .gchat-ai { font-size: 12px; }
+.gchat-ai-system {
+  background: #fffbea;
+  border-left: 3px solid #f0b429;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+}
 .gchat-ai .markdown-body { font-size: 12px; }
 .gchat-ai .markdown-body p { margin: 0 0 8px; }
 .gchat-ai .markdown-body p:last-child { margin-bottom: 0; }
