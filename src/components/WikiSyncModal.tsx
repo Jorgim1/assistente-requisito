@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import type { WikiPage, Artifact } from '../electron'
+import React, { useEffect, useRef, useState } from 'react'
+import type { WikiPage, Artifact, AgentUpdate } from '../electron'
 
 interface Props {
   gitlabProjectPath: string
@@ -30,17 +30,17 @@ function slugify(s: string): string {
 }
 
 const STATUS_LABEL: Record<SyncStatus, string> = {
-  loading:    '…',
-  synced:     '✅ Sincronizado',
-  diverged:   '⚠ Desatualizado',
+  loading:      '…',
+  synced:       '✅ Sincronizado',
+  diverged:     '⚠ Desatualizado',
   'local-only': '🖥 Apenas local',
   'wiki-only':  '☁ Apenas na wiki',
 }
 
 const STATUS_CLS: Record<SyncStatus, string> = {
-  loading:    'sync-status-loading',
-  synced:     'sync-status-synced',
-  diverged:   'sync-status-diverged',
+  loading:      'sync-status-loading',
+  synced:       'sync-status-synced',
+  diverged:     'sync-status-diverged',
   'local-only': 'sync-status-local',
   'wiki-only':  'sync-status-wiki',
 }
@@ -53,14 +53,74 @@ export default function WikiSyncModal({
   onClose,
   onArtifactSaved,
 }: Props) {
-  const [items, setItems]   = useState<SyncItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState<string | null>(null)
-  const [busy, setBusy]     = useState<string | null>(null)   // title sendo operado
+  const [items, setItems]       = useState<SyncItem[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [busy, setBusy]         = useState<string | null>(null)
+  const [aiStatus, setAiStatus] = useState<string | null>(null)
 
+  // Acumula resposta do AI via streaming
+  const aiAccRef      = useRef('')
+  const pushTargetRef = useRef<SyncItem | null>(null)
+  const homePage      = useRef<WikiPage | null>(null)
+
+  // Listener de streaming para o push via AI
   useEffect(() => {
-    load()
+    const unsub = window.electronAPI?.onAcpUpdate(async (update: AgentUpdate) => {
+      if (!pushTargetRef.current) return
+
+      if (update.type === 'AgentMessageChunk' && update.content) {
+        aiAccRef.current += update.content
+      } else if (update.type === 'TurnEnd') {
+        const item    = pushTargetRef.current
+        const rawText = aiAccRef.current.trim()
+        pushTargetRef.current = null
+        aiAccRef.current = ''
+
+        const api = window.electronAPI!
+
+        // Extrai blocos <HISTORIA> e <HOME> da resposta
+        const storyMatch = rawText.match(/<HISTORIA>([\s\S]*?)<\/HISTORIA>/i)
+        const homeMatch  = rawText.match(/<HOME>([\s\S]*?)<\/HOME>/i)
+
+        const storyContent = storyMatch ? storyMatch[1].trim() : rawText
+        const homeContent  = homeMatch  ? homeMatch[1].trim()  : null
+
+        try {
+          setAiStatus('Salvando na wiki…')
+
+          // 1. Cria ou atualiza a página da história
+          if (item.slug) {
+            await api.gitlab.wikiUpdate(gitlabProjectPath, item.slug, storyContent, item.title)
+          } else {
+            await api.gitlab.wikiCreate(gitlabProjectPath, item.title, storyContent)
+          }
+
+          // 2. Atualiza a Home se o AI retornou conteúdo novo para ela
+          if (homeContent && homePage.current) {
+            await api.gitlab.wikiUpdate(gitlabProjectPath, homePage.current.slug, homeContent, homePage.current.title)
+          }
+
+          setItems((prev) =>
+            prev.map((i) =>
+              i.title === item.title
+                ? { ...i, status: 'synced', wikiContent: storyContent }
+                : i
+            )
+          )
+        } catch (err) {
+          console.error('Erro ao salvar na wiki:', err)
+          setAiStatus('Erro ao salvar na wiki.')
+        } finally {
+          setBusy(null)
+          setAiStatus(null)
+        }
+      }
+    })
+    return () => unsub?.()
   }, [gitlabProjectPath])
+
+  useEffect(() => { load() }, [gitlabProjectPath])
 
   async function load() {
     setLoading(true)
@@ -69,14 +129,17 @@ export default function WikiSyncModal({
       const api = window.electronAPI!
       const wikiPages: WikiPage[] = await api.gitlab.wikiList(gitlabProjectPath)
 
-      // Mapeia wiki por slug normalizado
+      // Guarda referência da home para o push
+      const home = wikiPages.find((p) => /^home$/i.test(p.slug) || /^home$/i.test(p.title))
+      if (home) homePage.current = home
+
       const wikiBySlug = new Map<string, WikiPage>()
       for (const p of wikiPages) {
+        if (/^home$/i.test(p.slug)) continue  // exclui a Home da lista de sync
         wikiBySlug.set(slugify(p.title), p)
-        wikiBySlug.set(slugify(p.slug), p)
+        wikiBySlug.set(slugify(p.slug),  p)
       }
 
-      // Mapeia artefatos locais por slug normalizado
       const localBySlug = new Map<string, Artifact>()
       for (const a of localArtifacts) {
         localBySlug.set(slugify(a.title), a)
@@ -84,11 +147,14 @@ export default function WikiSyncModal({
 
       const allKeys = new Set([...wikiBySlug.keys(), ...localBySlug.keys()])
       const draft: SyncItem[] = []
+      const seen = new Set<string>()
 
       for (const key of allKeys) {
-        const wiki = wikiBySlug.get(key)
+        const wiki  = wikiBySlug.get(key)
         const local = localBySlug.get(key)
         const title = local?.title ?? wiki?.title ?? key
+        if (seen.has(title)) continue
+        seen.add(title)
 
         if (wiki && local) {
           draft.push({ title, slug: wiki.slug, artifact: local, status: 'loading' })
@@ -102,9 +168,8 @@ export default function WikiSyncModal({
       setItems(draft)
       setLoading(false)
 
-      // Busca conteúdo dos itens com correspondência para comparar
-      const matched = draft.filter((i) => i.status === 'loading')
-      for (const item of matched) {
+      // Compara conteúdo dos itens com correspondência em ambos os lados
+      for (const item of draft.filter((i) => i.status === 'loading')) {
         const [wikiPage, localContent] = await Promise.all([
           api.gitlab.wikiGet(gitlabProjectPath, item.slug!),
           item.artifact ? api.artifactsRead(item.artifact.id).catch(() => '') : Promise.resolve(''),
@@ -113,9 +178,7 @@ export default function WikiSyncModal({
         const status: SyncStatus = localContent.trim() === wikiContent.trim() ? 'synced' : 'diverged'
         setItems((prev) =>
           prev.map((i) =>
-            i.title === item.title
-              ? { ...i, status, localContent, wikiContent }
-              : i
+            i.title === item.title ? { ...i, status, localContent, wikiContent } : i
           )
         )
       }
@@ -127,53 +190,83 @@ export default function WikiSyncModal({
 
   async function handlePush(item: SyncItem) {
     setBusy(item.title)
-    try {
-      const api = window.electronAPI!
-      const content = item.localContent ?? await api.artifactsRead(item.artifact!.id)
-      if (item.slug) {
-        // Atualiza página existente
-        await api.gitlab.wikiUpdate(gitlabProjectPath, item.slug, content, item.title)
-      } else {
-        // Cria nova página
-        await api.gitlab.wikiCreate(gitlabProjectPath, item.title, content)
-      }
-      setItems((prev) =>
-        prev.map((i) => i.title === item.title ? { ...i, status: 'synced', wikiContent: content } : i)
-      )
-    } catch (err) {
-      console.error('Erro ao enviar para wiki:', err)
-    } finally {
-      setBusy(null)
+    setAiStatus('Lendo padrão da wiki…')
+
+    const api = window.electronAPI!
+
+    // Busca conteúdo local
+    const localContent = item.localContent
+      ?? (item.artifact ? await api.artifactsRead(item.artifact.id).catch(() => '') : '')
+
+    // Busca Home e uma página existente como referência de padrão
+    let homeContent = ''
+    let patternContent = ''
+
+    if (homePage.current) {
+      const homeFull = await api.gitlab.wikiGet(gitlabProjectPath, homePage.current.slug).catch(() => null)
+      homeContent = homeFull?.content ?? ''
     }
+
+    const syncedItem = items.find((i) => i.status === 'synced' && i.slug)
+    if (syncedItem) {
+      const ref = await api.gitlab.wikiGet(gitlabProjectPath, syncedItem.slug!).catch(() => null)
+      patternContent = ref?.content ?? ''
+    }
+
+    const homeSection = homeContent
+      ? `\nHOME PAGE ATUAL DA WIKI:\n${homeContent}\n`
+      : ''
+    const patternSection = patternContent
+      ? `\nEXEMPLO DE PÁGINA JÁ PUBLICADA NA WIKI (use como referência de formatação):\n${patternContent}\n`
+      : ''
+
+    const prompt =
+      `Você vai publicar a seguinte história na wiki do GitLab do projeto "${gitlabProjectPath}".
+${patternSection}${homeSection}
+CONTEÚDO LOCAL A PUBLICAR (título: "${item.title}"):
+${localContent}
+
+TAREFAS:
+1. Formate o conteúdo da história seguindo o padrão das páginas existentes na wiki.
+2. Se houver uma Home page, atualize-a para incluir o link para esta história (se ainda não estiver lá).
+
+Responda APENAS com os dois blocos abaixo, sem nenhum texto adicional:
+
+<HISTORIA>
+[conteúdo formatado da história]
+</HISTORIA>
+
+<HOME>
+[conteúdo atualizado da home page, ou deixe vazio se não houver home]
+</HOME>`
+
+    setAiStatus('Formatando com IA…')
+    pushTargetRef.current = { ...item, localContent }
+    aiAccRef.current = ''
+    api.sendPrompt(prompt)
   }
 
   async function handlePull(item: SyncItem) {
     setBusy(item.title)
     try {
-      const api = window.electronAPI!
-      const full = await api.gitlab.wikiGet(gitlabProjectPath, item.slug!)
+      const api   = window.electronAPI!
+      const full  = await api.gitlab.wikiGet(gitlabProjectPath, item.slug!)
       if (!full?.content) return
+
       if (item.artifact) {
         await api.artifactsUpdate(item.artifact.id, full.content)
         onArtifactSaved({ ...item.artifact })
-        setItems((prev) =>
-          prev.map((i) =>
-            i.title === item.title
-              ? { ...i, status: 'synced', localContent: full.content, wikiContent: full.content }
-              : i
-          )
-        )
       } else {
         const artifact = await api.artifactsCreate(projectId, 'historia', item.title, full.content, projectFolderPath)
         onArtifactSaved(artifact)
-        setItems((prev) =>
-          prev.map((i) =>
-            i.title === item.title
-              ? { ...i, status: 'synced', artifact, localContent: full.content, wikiContent: full.content }
-              : i
-          )
-        )
       }
+      setItems((prev) =>
+        prev.map((i) =>
+          i.title === item.title
+            ? { ...i, status: 'synced', localContent: full.content, wikiContent: full.content }
+            : i
+        )
+      )
     } catch (err) {
       console.error('Erro ao importar da wiki:', err)
     } finally {
@@ -188,6 +281,12 @@ export default function WikiSyncModal({
       <div className="modal-card wiki-sync-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">Sincronizar com Wiki</div>
         <p className="wiki-modal-project">{gitlabProjectPath}</p>
+
+        {aiStatus && (
+          <div className="wiki-sync-ai-status">
+            <span className="spin-icon">⟳</span> {aiStatus}
+          </div>
+        )}
 
         {loading && <p className="wiki-modal-status">Carregando e comparando…</p>}
         {error   && <p className="wiki-modal-error">{error}</p>}
@@ -212,52 +311,28 @@ export default function WikiSyncModal({
                   {STATUS_LABEL[item.status]}
                 </span>
                 <span className="wiki-sync-actions">
-                  {item.status === 'local-only' && (
+                  {(item.status === 'local-only' || item.status === 'diverged') && (
                     <button
                       className="wiki-sync-btn wiki-sync-btn-push"
                       disabled={isBusy}
                       onClick={() => handlePush(item)}
-                      title="Enviar para wiki"
+                      title="Formatar com IA e enviar para wiki"
                     >
-                      {busy === item.title ? '…' : '⬆ Enviar'}
+                      {busy === item.title && aiStatus ? '…' : '⬆ Enviar'}
                     </button>
                   )}
-                  {item.status === 'wiki-only' && (
+                  {(item.status === 'wiki-only' || item.status === 'diverged') && (
                     <button
                       className="wiki-sync-btn wiki-sync-btn-pull"
                       disabled={isBusy}
                       onClick={() => handlePull(item)}
                       title="Importar da wiki"
                     >
-                      {busy === item.title ? '…' : '⬇ Importar'}
+                      {busy === item.title && !aiStatus ? '…' : '⬇ Importar'}
                     </button>
                   )}
-                  {item.status === 'diverged' && (
-                    <>
-                      <button
-                        className="wiki-sync-btn wiki-sync-btn-push"
-                        disabled={isBusy}
-                        onClick={() => handlePush(item)}
-                        title="Enviar versão local para wiki"
-                      >
-                        {busy === item.title ? '…' : '⬆ Enviar'}
-                      </button>
-                      <button
-                        className="wiki-sync-btn wiki-sync-btn-pull"
-                        disabled={isBusy}
-                        onClick={() => handlePull(item)}
-                        title="Importar versão da wiki"
-                      >
-                        {busy === item.title ? '…' : '⬇ Importar'}
-                      </button>
-                    </>
-                  )}
-                  {item.status === 'synced' && (
-                    <span className="wiki-sync-ok">—</span>
-                  )}
-                  {item.status === 'loading' && (
-                    <span className="wiki-sync-ok">…</span>
-                  )}
+                  {item.status === 'synced' && <span className="wiki-sync-ok">—</span>}
+                  {item.status === 'loading' && <span className="wiki-sync-ok">…</span>}
                 </span>
               </div>
             ))}
@@ -265,7 +340,7 @@ export default function WikiSyncModal({
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-          <button className="modal-btn-cancel" onClick={onClose}>Fechar</button>
+          <button className="modal-btn-cancel" onClick={onClose} disabled={isBusy}>Fechar</button>
         </div>
       </div>
     </div>

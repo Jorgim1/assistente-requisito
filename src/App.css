@@ -3087,6 +3087,14 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .wiki-sync-btn-pull:hover:not(:disabled) { background: #eff6ff; }
 .wiki-sync-ok { color: var(--gray-mute); font-size: 12px; }
+.wiki-sync-ai-status {
+  font-size: 12px;
+  color: var(--red);
+  padding: 6px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .sidebar-list {
   flex: 1;
