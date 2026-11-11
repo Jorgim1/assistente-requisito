@@ -121,8 +121,10 @@ export default function ReadinessPanel({
   const handleSaveArtifact = async () => {
     const api = window.electronAPI
     if (!api || !activeProject || !result) return
-    const date = new Date().toLocaleDateString('pt-BR')
-    const title = `Validação DoR — ${date}`
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const stamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}h${pad(now.getMinutes())}`
+    const title = `Validação DoR — ${stamp}`
     const artifact = await api.artifactsCreate(activeProject.id, 'validacao', title, result, activeProject.path)
     onArtifactSaved?.(artifact)
   }

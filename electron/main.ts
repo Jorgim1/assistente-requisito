@@ -55,6 +55,7 @@ function createWindow(): BrowserWindow {
     frame: false,
     backgroundColor: '#ffffff',
     show: false,
+    icon: path.join(__dirname, '../public/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

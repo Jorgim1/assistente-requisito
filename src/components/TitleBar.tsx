@@ -60,7 +60,7 @@ export default function TitleBar({
     <div className="titlebar">
       <div className="tb-logo">
         <span className="tb-logo-brand">AceleraAI</span>
-        <span className="tb-logo-app">Assistente de IA</span>
+        <span className="tb-logo-app">Assistente de Requisitos</span>
       </div>
 
       <div className="tb-divider" />
