@@ -37,8 +37,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "pro-acelerai",
-      "repo": "powers-kiro"
+      "owner": "Jorgim1",
+      "repo": "assistente-requisito"
     }
   },
   "dependencies": {
