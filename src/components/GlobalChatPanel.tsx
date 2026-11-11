@@ -36,6 +36,11 @@ export default function GlobalChatPanel({
 
   useEffect(() => { isProcessingRef.current = isProcessing }, [isProcessing])
 
+  // Limpa o histórico ao trocar de projeto
+  useEffect(() => {
+    setMessages([])
+  }, [activeProject?.id])
+
   // Escuta streaming da IA
   useEffect(() => {
     const unsub = window.electronAPI?.onAcpUpdate((update: AgentUpdate) => {
