@@ -3022,6 +3022,72 @@ html, body, #root { height: 100%; overflow: hidden; }
 .wiki-import-btn:hover:not(:disabled) { background: var(--red-light); }
 .wiki-import-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* ── WikiSyncModal ───────────────────────────────────────────────── */
+.wiki-sync-card {
+  min-width: 580px;
+  max-width: 760px;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+}
+.wiki-sync-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--gray-bdr);
+  border-radius: 6px;
+}
+.wiki-sync-header {
+  display: grid;
+  grid-template-columns: 1fr 160px 160px;
+  padding: 6px 12px;
+  background: var(--gray-bg);
+  border-bottom: 1px solid var(--gray-bdr);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-mute);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.wiki-sync-row {
+  display: grid;
+  grid-template-columns: 1fr 160px 160px;
+  align-items: center;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--gray-bdr);
+  font-size: 12px;
+}
+.wiki-sync-row:last-child { border-bottom: none; }
+.wiki-sync-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wiki-sync-status { font-size: 11px; }
+.sync-status-synced   { color: #22a35b; }
+.sync-status-diverged { color: #d97706; }
+.sync-status-local    { color: #2563eb; }
+.sync-status-wiki     { color: #7c3aed; }
+.sync-status-loading  { color: var(--gray-mute); }
+.wiki-sync-actions { display: flex; gap: 4px; }
+.wiki-sync-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wiki-sync-btn:disabled { opacity: 0.5; cursor: default; }
+.wiki-sync-btn-push {
+  border-color: var(--red);
+  color: var(--red);
+  background: transparent;
+}
+.wiki-sync-btn-push:hover:not(:disabled) { background: var(--red-light); }
+.wiki-sync-btn-pull {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: transparent;
+}
+.wiki-sync-btn-pull:hover:not(:disabled) { background: #eff6ff; }
+.wiki-sync-ok { color: var(--gray-mute); font-size: 12px; }
+
 .sidebar-list {
   flex: 1;
   overflow-y: auto;

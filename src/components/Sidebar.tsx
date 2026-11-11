@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { Project, Artifact, ArtifactType } from '../electron'
-import WikiModal from './WikiModal'
+import WikiSyncModal from './WikiSyncModal'
 
 // "Estimated Usage | resets on 2026-12-01 | KIRO PRO+ Credits (433.77 of 2000 ...) 21.7%"
 // → linha 1: "KIRO PRO+ | resets on 2026-12-01"
@@ -600,12 +600,13 @@ export default function Sidebar({
         const proj = projects.find((p) => p.id === activeProjectId)
         if (!proj?.gitlabProjectPath) return null
         return (
-          <WikiModal
+          <WikiSyncModal
             gitlabProjectPath={proj.gitlabProjectPath}
             projectId={proj.id}
             projectFolderPath={proj.path}
+            localArtifacts={artifacts[proj.id] ?? []}
             onClose={() => setWikiOpen(false)}
-            onArtifactSaved={(artifact) => { onArtifactSaved(artifact); setWikiOpen(false) }}
+            onArtifactSaved={(artifact) => { onArtifactSaved(artifact) }}
           />
         )
       })()}

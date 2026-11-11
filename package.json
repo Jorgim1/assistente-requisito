@@ -1,6 +1,6 @@
 {
   "name": "assistente-requisito",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Assistente de Requisitos — criação, derivação e validação de histórias",
   "main": "dist-electron/main.js",
   "type": "module",
