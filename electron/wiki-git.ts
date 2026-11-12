@@ -13,7 +13,7 @@ function run(args: string[], cwd: string): Promise<string> {
     proc.stdout.on('data', (d: Buffer) => { out += d.toString() })
     proc.stderr.on('data', (d: Buffer) => { err += d.toString() })
     proc.on('close', (code) => {
-      if (code === 0) resolve(out.trim())
+      if (code === 0) resolve((out || err).trim())  // git push escreve progresso no stderr
       else reject(new Error(err.trim() || out.trim() || `git exited with code ${code}`))
     })
     proc.on('error', reject)
