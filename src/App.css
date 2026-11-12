@@ -5057,11 +5057,14 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .wiki-git-page-badge {
   font-size: 10px;
-  font-weight: 700;
-  color: var(--green);
-  min-width: 44px;
+  font-weight: 600;
+  min-width: 68px;
   text-align: right;
+  border-radius: 8px;
+  padding: 1px 6px;
 }
+.wiki-git-page-badge--local { background: #d1fae5; color: #065f46; }
+.wiki-git-page-badge--git   { background: var(--gray-bg); color: var(--gray-mute); border: 1px solid var(--gray-bdr); }
 .wiki-git-import-btn {
   padding: 4px 10px;
   border: 1px solid var(--gray-bdr);

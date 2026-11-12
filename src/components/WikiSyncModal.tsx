@@ -407,7 +407,7 @@ export default function WikiSyncModal({
         <div className="wiki-git-section wiki-git-section--pages">
           <div className="wiki-git-section-title">
             Páginas ({pages.length})
-            <span className="wiki-git-pages-hint">Clique em Importar para criar um artefato local</span>
+            <span className="wiki-git-pages-hint">Arquivos já locais (git) — Registrar cria o artefato no app</span>
           </div>
           {pages.length === 0 ? (
             <p className="wiki-git-empty">Nenhuma página .md encontrada na wiki.</p>
@@ -415,25 +415,26 @@ export default function WikiSyncModal({
             <div className="wiki-git-pages-list">
               {pages.map((filename) => {
                 const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
+                // Usa slugify para tolerar diferenças de acento/hífens entre nome de arquivo e título do artefato
                 const hasArtifact = wikiArtifacts.some(
-                  (a) => a.title.toLowerCase() === title.toLowerCase(),
+                  (a) => slugify(a.title) === slugify(title),
                 )
                 return (
                   <div key={filename} className="wiki-git-page-row">
                     <span className="wiki-git-page-name" title={filename}>
                       📄 {title.length > 44 ? title.slice(0, 44) + '…' : title}
                     </span>
-                    <span className={`wiki-git-page-badge ${hasArtifact ? 'wiki-git-page-badge--local' : ''}`}>
-                      {hasArtifact ? '✓ local' : ''}
+                    <span className={`wiki-git-page-badge ${hasArtifact ? 'wiki-git-page-badge--local' : 'wiki-git-page-badge--git'}`}>
+                      {hasArtifact ? '✓ artefato' : '↓ git'}
                     </span>
                     <button
                       className="wiki-git-import-btn"
                       onClick={() => handleImportPage(filename)}
                       disabled={isBusy}
-                      title={hasArtifact ? 'Atualizar artefato com conteúdo da wiki' : 'Importar como artefato'}
+                      title={hasArtifact ? 'Atualizar artefato com conteúdo do arquivo local' : 'Registrar arquivo git como artefato no app'}
                     >
                       {busy === `import-${filename}` ? <span className="spin-icon">⟳</span>
-                        : hasArtifact ? '↻ Atualizar' : '⬇ Importar'}
+                        : hasArtifact ? '↻ Atualizar' : '+ Registrar'}
                     </button>
                   </div>
                 )
