@@ -282,17 +282,14 @@ export default function GlobalChatPanel({
                   <div className="gchat-ai">
                     <MarkdownRenderer content={msg.content} />
                     {msg.streaming && <span className="gchat-cursor" />}
+                    {!msg.streaming && (msg.credits != null || msg.model) && (
+                      <div className="gchat-msg-meta">
+                        {msg.model && <span>Modelo: {shortModel(msg.model)}</span>}
+                        {msg.model && msg.credits != null && msg.credits > 0 && <span className="gchat-meta-sep">·</span>}
+                        {msg.credits != null && msg.credits > 0 && <span>Créditos: {msg.credits.toFixed(2)}</span>}
+                      </div>
+                    )}
                   </div>
-                  {!msg.streaming && (msg.credits != null || msg.model) && (
-                    <div className="gchat-msg-meta">
-                      {msg.model && (
-                        <span className="gchat-msg-model">{shortModel(msg.model)}</span>
-                      )}
-                      {msg.credits != null && msg.credits > 0 && (
-                        <span className="gchat-msg-credits">💳 {msg.credits.toFixed(2)}</span>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

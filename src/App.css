@@ -4503,26 +4503,18 @@ html, body, #root { height: 100%; overflow: hidden; }
   background: none; border: none; color: #cdd6f4; font-size: 12px;
 }
 
-/* Meta (model + credits) */
+/* Meta (model + credits) — dentro do card, separado por linha */
 .gchat-msg-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 2px;
-}
-.gchat-msg-model {
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 7px;
+  border-top: 1px solid #f0f0f0;
   font-size: 10px;
   color: var(--gray-mute);
-  background: var(--gray-bg);
-  border: 1px solid var(--gray-bdr);
-  border-radius: 8px;
-  padding: 1px 6px;
 }
-.gchat-msg-credits {
-  font-size: 10px;
-  color: #6366f1;
-  font-weight: 600;
-}
+.gchat-meta-sep { opacity: .4; }
 
 /* Streaming cursor */
 .gchat-cursor {
