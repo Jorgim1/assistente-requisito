@@ -20,7 +20,7 @@ import { DERIVATION_SKILL_LACUNAS, DERIVATION_SKILL_ANEXO, DERIVATION_HTML_GUIDE
 import {
   wikiRepoPath, wikiIsCloned, wikiClone,
   wikiPull, wikiPush, wikiStatus, wikiDiff, wikiLog, wikiCommit,
-  wikiListPages, wikiReadPage, wikiWritePage,
+  wikiListPages, wikiReadPage, wikiWritePage, wikiRestore,
 } from './wiki-git.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -698,6 +698,7 @@ ipcMain.handle('wiki:commit', async (_, projectPath: string, message: string) =>
 ipcMain.handle('wiki:list-pages', async (_, projectPath: string) => wikiListPages(wikiRepoPath(projectPath)))
 ipcMain.handle('wiki:read-page',  async (_, projectPath: string, filename: string) => wikiReadPage(wikiRepoPath(projectPath), filename))
 ipcMain.handle('wiki:write-page', async (_, projectPath: string, filename: string, content: string) => wikiWritePage(wikiRepoPath(projectPath), filename, content))
+ipcMain.handle('wiki:restore',    async (_, projectPath: string, file?: string) => wikiRestore(wikiRepoPath(projectPath), file))
 
 // ── Ciclo de vida ─────────────────────────────────────────────────
 app.whenReady().then(async () => {

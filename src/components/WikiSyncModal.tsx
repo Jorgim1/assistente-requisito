@@ -13,6 +13,23 @@ interface Props {
 // Tipos de artefato que vão para a wiki (HU por enquanto; HT quando for adicionado)
 const WIKI_ARTIFACT_TYPES = ['historia']
 
+interface StatusFile {
+  code: string   // 'M', 'D', 'A', '??' etc
+  filename: string
+}
+
+function slugify(s: string): string {
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function parseStatus(raw: string): StatusFile[] {
+  return raw.trim().split('\n')
+    .filter((l) => l.trim())
+    .map((l) => ({ code: l.slice(0, 2).trim(), filename: l.slice(3).trim() }))
+}
+
 export default function WikiSyncModal({
   gitlabProjectPath,
   projectId,
@@ -25,17 +42,18 @@ export default function WikiSyncModal({
   const wikiPath = projectFolderPath + '/.wiki'
   // Apenas artefatos dos tipos permitidos (HU, futuramente HT)
   const wikiArtifacts = localArtifacts.filter((a) => WIKI_ARTIFACT_TYPES.includes(a.type))
-  const [cloned, setCloned]       = useState<boolean | null>(null)
-  const [cloning, setCloning]     = useState(false)
-  const [status, setStatus]       = useState('')
-  const [pages, setPages]         = useState<string[]>([])
-  const [log, setLog]             = useState('')
-  const [diff, setDiff]           = useState('')
-  const [commitMsg, setCommitMsg] = useState('')
-  const [busy, setBusy]           = useState('')
-  const [error, setError]         = useState('')
-  const [showLog, setShowLog]     = useState(false)
-  const [showDiff, setShowDiff]   = useState(false)
+  const [cloned, setCloned]         = useState<boolean | null>(null)
+  const [cloning, setCloning]       = useState(false)
+  const [status, setStatus]         = useState('')
+  const [statusFiles, setStatusFiles] = useState<StatusFile[]>([])
+  const [pages, setPages]           = useState<string[]>([])
+  const [log, setLog]               = useState('')
+  const [diff, setDiff]             = useState('')
+  const [commitMsg, setCommitMsg]   = useState('')
+  const [busy, setBusy]             = useState('')
+  const [error, setError]           = useState('')
+  const [showLog, setShowLog]       = useState(false)
+  const [showDiff, setShowDiff]     = useState(false)
 
   const api = window.electronAPI!
 
@@ -62,6 +80,7 @@ export default function WikiSyncModal({
         api.wikiGit.log(projectFolderPath, 8),
       ])
       setStatus(s)
+      setStatusFiles(parseStatus(s))
       setPages(p)
       setLog(l)
     } catch (e) {
@@ -140,14 +159,28 @@ export default function WikiSyncModal({
     }
   }
 
+  async function handleRestore(file?: string) {
+    setBusy(file ? `restore-${file}` : 'restore-all')
+    setError('')
+    try {
+      await api.wikiGit.restore(projectFolderPath, file)
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function handleImportPage(filename: string) {
     setBusy(`import-${filename}`)
     setError('')
     try {
       const content = await api.wikiGit.readPage(projectFolderPath, filename)
       const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
+      // Comparação slugificada para tolerar diferenças de acento e case
       const existing = wikiArtifacts.find(
-        (a) => a.title.toLowerCase() === title.toLowerCase(),
+        (a) => slugify(a.title) === slugify(title),
       )
       if (existing) {
         await api.artifactsUpdate(existing.id, content)
@@ -305,11 +338,42 @@ export default function WikiSyncModal({
           </div>
         )}
 
-        {/* Commit */}
+        {/* Alterações pendentes */}
         {isDirty && (
           <div className="wiki-git-section">
-            <div className="wiki-git-section-title">Commitar alterações</div>
-            <div className="wiki-git-status-preview">{status}</div>
+            <div className="wiki-git-section-title">
+              Alterações pendentes
+              <button
+                className="wiki-git-action-btn wiki-git-action-btn--discard"
+                onClick={() => handleRestore()}
+                disabled={isBusy}
+                title="git restore . && git clean -fd"
+              >
+                {busy === 'restore-all' ? <span className="spin-icon">⟳</span> : '↩'} Descartar tudo
+              </button>
+            </div>
+            {/* Arquivo por arquivo com código e botão descartar */}
+            <div className="wiki-git-status-files">
+              {statusFiles.map((sf) => (
+                <div key={sf.filename} className="wiki-git-status-file-row">
+                  <span className={`wiki-git-status-code wiki-git-code-${sf.code === 'D' ? 'deleted' : sf.code === '??' ? 'untracked' : 'modified'}`}>
+                    {sf.code === 'D' ? '✗ deletado' : sf.code === '??' ? '+ novo' : '~ modificado'}
+                  </span>
+                  <span className="wiki-git-status-fname" title={sf.filename}>
+                    {sf.filename.length > 36 ? '…' + sf.filename.slice(-34) : sf.filename}
+                  </span>
+                  <button
+                    className="wiki-git-discard-btn"
+                    onClick={() => handleRestore(sf.filename)}
+                    disabled={isBusy}
+                    title={`git restore -- ${sf.filename}`}
+                  >
+                    {busy === `restore-${sf.filename}` ? <span className="spin-icon">⟳</span> : '↩'}
+                  </button>
+                </div>
+              ))}
+            </div>
+            {/* Commit row */}
             <div className="wiki-git-commit-row">
               <input
                 className="wiki-git-commit-input"

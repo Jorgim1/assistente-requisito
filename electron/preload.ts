@@ -148,5 +148,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listPages: (projectPath: string) => ipcRenderer.invoke('wiki:list-pages', projectPath) as Promise<string[]>,
     readPage:  (projectPath: string, filename: string) => ipcRenderer.invoke('wiki:read-page', projectPath, filename) as Promise<string>,
     writePage: (projectPath: string, filename: string, content: string) => ipcRenderer.invoke('wiki:write-page', projectPath, filename, content) as Promise<void>,
+    restore:   (projectPath: string, file?: string) => ipcRenderer.invoke('wiki:restore', projectPath, file) as Promise<string>,
   },
 })

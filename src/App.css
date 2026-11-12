@@ -4758,9 +4758,11 @@ html, body, #root { height: 100%; overflow: hidden; }
 .wiki-git-action-btn--pull:hover:not(:disabled)  { background: #d8e4ff; }
 .wiki-git-action-btn--push  { color: var(--green); border-color: var(--green-bdr); background: var(--green-bg); }
 .wiki-git-action-btn--push:hover:not(:disabled)  { background: #c8f0d8; }
-.wiki-git-action-btn--commit { color: var(--gray-dark); border-color: var(--gray-bdr); }
-.wiki-git-action-btn--log   {}
-.wiki-git-action-btn--diff  {}
+.wiki-git-action-btn--commit  { color: var(--gray-dark); border-color: var(--gray-bdr); }
+.wiki-git-action-btn--discard { color: #b45309; border-color: #fbbf24; background: #fffbeb; font-size: 10px; margin-left: auto; }
+.wiki-git-action-btn--discard:hover:not(:disabled) { background: #fef3c7; }
+.wiki-git-action-btn--log    {}
+.wiki-git-action-btn--diff   {}
 
 /* Sections */
 .wiki-git-section {
@@ -4795,7 +4797,54 @@ html, body, #root { height: 100%; overflow: hidden; }
   letter-spacing: 0;
 }
 
-/* Status preview */
+/* Status files list (por arquivo com Descartar) */
+.wiki-git-status-files {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.wiki-git-status-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 2px 0;
+}
+.wiki-git-status-code {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  min-width: 72px;
+}
+.wiki-git-code-modified  { background: #fef3c7; color: #92400e; }
+.wiki-git-code-deleted   { background: #fee2e2; color: #b91c1c; }
+.wiki-git-code-untracked { background: #d1fae5; color: #065f46; }
+.wiki-git-status-fname {
+  flex: 1;
+  font-family: var(--mono);
+  color: var(--gray-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wiki-git-discard-btn {
+  background: none;
+  border: 1px solid #fbbf24;
+  color: #b45309;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.wiki-git-discard-btn:hover:not(:disabled) { background: #fef3c7; }
+.wiki-git-discard-btn:disabled { opacity: .4; cursor: default; }
+
+/* Status preview (mantido para compatibilidade) */
 .wiki-git-status-preview {
   font-family: var(--mono);
   font-size: 11px;

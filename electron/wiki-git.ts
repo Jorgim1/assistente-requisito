@@ -96,3 +96,20 @@ export async function wikiReadPage(localPath: string, filename: string): Promise
 export async function wikiWritePage(localPath: string, filename: string, content: string): Promise<void> {
   await fs.promises.writeFile(path.join(localPath, filename), content, 'utf-8')
 }
+
+// Descarta alterações de um arquivo (ou todos) no working tree
+export async function wikiRestore(localPath: string, file?: string): Promise<string> {
+  if (file) {
+    // Para arquivos não rastreados (untracked) usa clean; para modificados/deletados usa restore
+    const status = await run(['status', '--porcelain', '--', file], localPath).catch(() => '')
+    if (status.startsWith('??')) {
+      await run(['clean', '-fd', '--', file], localPath)
+      return `${file} removido`
+    }
+    return run(['restore', '--', file], localPath)
+  }
+  // Descarta todas as alterações rastreadas; remove untracked também
+  await run(['restore', '.'], localPath).catch(() => { /* ignore if nothing to restore */ })
+  await run(['clean', '-fd'], localPath).catch(() => { /* ignore if nothing to clean */ })
+  return 'Todas as alterações descartadas'
+}

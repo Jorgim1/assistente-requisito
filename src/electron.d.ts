@@ -192,6 +192,7 @@ export interface ElectronAPI {
     listPages: (projectPath: string) => Promise<string[]>
     readPage:  (projectPath: string, filename: string) => Promise<string>
     writePage: (projectPath: string, filename: string, content: string) => Promise<void>
+    restore:   (projectPath: string, file?: string) => Promise<string>
   }
 }
 
