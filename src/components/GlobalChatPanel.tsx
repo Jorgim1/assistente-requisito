@@ -39,6 +39,11 @@ function detectSkill(text: string): Skill | null {
   return null
 }
 
+// Corrige "palavra.Palavra" → "palavra. Palavra" (modelo às vezes omite espaço)
+function fixSpacing(text: string): string {
+  return text.replace(/([a-záéíóúàãõâêôüç,;])\.([A-ZÁÉÍÓÚÀÃÕÂÊÔÜ])/g, '$1. $2')
+}
+
 function shortModel(model?: string): string {
   if (!model) return ''
   if (model.includes('opus'))   return 'Opus'
@@ -280,7 +285,7 @@ export default function GlobalChatPanel({
               ) : (
                 <div className="gchat-ai-wrapper">
                   <div className="gchat-ai">
-                    <MarkdownRenderer content={msg.content} />
+                    <MarkdownRenderer content={fixSpacing(msg.content)} />
                     {msg.streaming && <span className="gchat-cursor" />}
                     {!msg.streaming && (msg.credits != null || msg.model) && (
                       <div className="gchat-msg-meta">
