@@ -6,7 +6,9 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
-  system?: boolean  // mensagens do próprio app (perguntas de skill)
+  system?: boolean
+  credits?: number
+  model?: string
 }
 
 interface Props {
@@ -37,6 +39,14 @@ function detectSkill(text: string): Skill | null {
   return null
 }
 
+function shortModel(model?: string): string {
+  if (!model) return ''
+  if (model.includes('opus'))   return 'Opus'
+  if (model.includes('sonnet')) return 'Sonnet'
+  if (model.includes('haiku'))  return 'Haiku'
+  return model.split('-')[0]
+}
+
 export default function GlobalChatPanel({
   acpStatus,
   width,
@@ -46,27 +56,27 @@ export default function GlobalChatPanel({
   onProcessingChange,
   activeProject,
 }: Props) {
-  const [messages, setMessages]       = useState<ChatMessage[]>([])
-  const [inputText, setInputText]     = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [messages, setMessages]           = useState<ChatMessage[]>([])
+  const [inputText, setInputText]         = useState('')
+  const [isProcessing, setIsProcessing]   = useState(false)
   const [awaitingSkill, setAwaitingSkill] = useState(false)
   const [pendingMsg, setPendingMsg]       = useState('')
   const [activeSkill, setActiveSkill]     = useState<Skill | null>(null)
+  const [sessionCredits, setSessionCredits] = useState(0)
 
   const isProcessingRef = useRef(false)
   const chatEndRef      = useRef<HTMLDivElement>(null)
 
   useEffect(() => { isProcessingRef.current = isProcessing }, [isProcessing])
 
-  // Limpa o histórico ao trocar de projeto
   useEffect(() => {
     setMessages([])
     setAwaitingSkill(false)
     setPendingMsg('')
     setActiveSkill(null)
+    setSessionCredits(0)
   }, [activeProject?.id])
 
-  // Escuta streaming da IA
   useEffect(() => {
     const unsub = window.electronAPI?.onAcpUpdate((update: AgentUpdate) => {
       if (!isProcessingRef.current) return
@@ -83,13 +93,20 @@ export default function GlobalChatPanel({
         setMessages((prev) => {
           const next = [...prev]
           const last = next[next.length - 1]
-          if (last?.role === 'assistant' && !last.system) next[next.length - 1] = { ...last, streaming: false }
+          if (last?.role === 'assistant' && !last.system) {
+            next[next.length - 1] = {
+              ...last,
+              streaming: false,
+              credits: update.credits,
+              model: update.model,
+            }
+          }
           return next
         })
+        if (update.credits) setSessionCredits((c) => c + update.credits!)
         setIsProcessing(false)
         isProcessingRef.current = false
         onProcessingChange?.(false)
-        // Desativa a steering após a resposta
         setActiveSkill((skill) => {
           if (skill === 'extrator') window.electronAPI?.extrator?.deactivate()
           else if (skill === 'lacunas' || skill === 'anexo') window.electronAPI?.derivation?.deactivate()
@@ -146,14 +163,13 @@ export default function GlobalChatPanel({
     if (!text || isProcessing || acpStatus !== 'ready') return
     setInputText('')
 
-    // Resposta à pergunta de skill
     if (awaitingSkill && pendingMsg) {
       const yes = /^(sim|s\b|yes|y\b|quero|ok\b|pode|ativa)/i.test(text)
       const no  = /^(não|nao|n\b|no\b|sem|direto|ignora)/i.test(text)
       if (yes || no) {
         setMessages((prev) => [...prev, { role: 'user', content: text }])
         setAwaitingSkill(false)
-        const msg = pendingMsg
+        const msg   = pendingMsg
         const skill = yes ? (activeSkill ?? null) : null
         setPendingMsg('')
         if (!yes) setActiveSkill(null)
@@ -164,7 +180,6 @@ export default function GlobalChatPanel({
 
     setMessages((prev) => [...prev, { role: 'user', content: text }])
 
-    // Detecta skill se projeto ativo
     if (activeProject) {
       const detected = detectSkill(text)
       if (detected) {
@@ -189,9 +204,8 @@ export default function GlobalChatPanel({
     const startX = e.clientX
     const startW = width
     const onMove = (ev: MouseEvent) => {
-      const delta = startX - ev.clientX
       const maxW = window.innerWidth - 200
-      onWidthChange(Math.max(240, Math.min(maxW, startW + delta)))
+      onWidthChange(Math.max(240, Math.min(maxW, startW + (startX - ev.clientX))))
     }
     const onUp = () => {
       window.removeEventListener('mousemove', onMove)
@@ -201,41 +215,84 @@ export default function GlobalChatPanel({
     window.addEventListener('mouseup', onUp)
   }
 
+  const isReady = acpStatus === 'ready'
+
   return (
     <>
       <div className="gchat-resize-handle" onMouseDown={onResizeMouseDown} />
 
       <div className="gchat-panel" style={{ width }}>
+
+        {/* Header */}
         <div className="gchat-header">
-          <span className="gchat-header-title">CHAT</span>
-          {contextArtifacts.length > 0 && (
-            <div className="gchat-context-pills">
-              {contextArtifacts.map((a) => (
-                <span key={a.id} className="gchat-context-pill" title={a.title}>
-                  📄 {a.title.length > 20 ? a.title.slice(0, 20) + '…' : a.title}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="gchat-header-left">
+            <span className="gchat-header-title">Chat</span>
+            {activeProject && (
+              <span className="gchat-header-project">{activeProject.name}</span>
+            )}
+          </div>
+          <div className="gchat-header-right">
+            {sessionCredits > 0 && (
+              <span className="gchat-session-credits" title="Créditos gastos nesta sessão">
+                💳 {sessionCredits.toFixed(2)}
+              </span>
+            )}
+            <span className={`gchat-status-dot gchat-status-${acpStatus}`} title={acpStatus} />
+          </div>
         </div>
 
+        {/* Context pills */}
+        {contextArtifacts.length > 0 && (
+          <div className="gchat-context-bar">
+            {contextArtifacts.map((a) => (
+              <span key={a.id} className="gchat-context-pill" title={a.title}>
+                📄 {a.title.length > 24 ? a.title.slice(0, 24) + '…' : a.title}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Messages */}
         <div className="gchat-messages">
           {messages.length === 0 && (
             <div className="gchat-empty">
-              <p>
+              <div className="gchat-empty-icon">✦</div>
+              <p className="gchat-empty-title">Assistente de Requisitos</p>
+              <p className="gchat-empty-hint">
                 {contextArtifacts.length > 0
-                  ? `Contexto: ${contextArtifacts.length} artefato(s). Faça uma pergunta ou peça uma modificação.`
-                  : 'Faça perguntas sobre o projeto ou selecione artefatos para usá-los como contexto.'}
+                  ? `${contextArtifacts.length} artefato(s) no contexto`
+                  : 'Selecione artefatos ou faça uma pergunta'}
               </p>
             </div>
           )}
+
           {messages.map((msg, i) => (
             <div key={i} className={`gchat-msg gchat-msg-${msg.role}`}>
               {msg.role === 'user' ? (
                 <div className="gchat-bubble">{msg.content}</div>
+              ) : msg.system ? (
+                <div className="gchat-ai-system">
+                  <span className="gchat-ai-system-icon">⚡</span>
+                  <div className="gchat-ai-system-body">
+                    <MarkdownRenderer content={msg.content} />
+                  </div>
+                </div>
               ) : (
-                <div className={`gchat-ai${msg.system ? ' gchat-ai-system' : ''}`}>
-                  <MarkdownRenderer content={msg.content + (msg.streaming ? '\n\n▌' : '')} />
+                <div className="gchat-ai-wrapper">
+                  <div className="gchat-ai">
+                    <MarkdownRenderer content={msg.content} />
+                    {msg.streaming && <span className="gchat-cursor" />}
+                  </div>
+                  {!msg.streaming && (msg.credits != null || msg.model) && (
+                    <div className="gchat-msg-meta">
+                      {msg.model && (
+                        <span className="gchat-msg-model">{shortModel(msg.model)}</span>
+                      )}
+                      {msg.credits != null && msg.credits > 0 && (
+                        <span className="gchat-msg-credits">💳 {msg.credits.toFixed(2)}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -243,22 +300,27 @@ export default function GlobalChatPanel({
           <div ref={chatEndRef} />
         </div>
 
-        <div className="gchat-input-row">
+        {/* Input */}
+        <div className="gchat-input-area">
           <textarea
             className="gchat-input"
-            placeholder={acpStatus === 'ready' ? 'Mensagem… (Enter para enviar)' : 'Aguardando conexão…'}
+            placeholder={isReady ? 'Mensagem… (Enter para enviar, Shift+Enter para quebrar linha)' : 'Aguardando conexão…'}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isProcessing || acpStatus !== 'ready'}
-            rows={3}
+            disabled={isProcessing || !isReady}
+            rows={2}
           />
           <button
             className="gchat-send-btn"
             onClick={handleSend}
-            disabled={!inputText.trim() || isProcessing || acpStatus !== 'ready'}
+            disabled={!inputText.trim() || isProcessing || !isReady}
+            title="Enviar (Enter)"
           >
-            {isProcessing ? <span className="spin-icon">⟳</span> : '↑'}
+            {isProcessing
+              ? <span className="gchat-typing"><span /><span /><span /></span>
+              : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            }
           </button>
         </div>
       </div>
