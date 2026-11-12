@@ -10,6 +10,9 @@ interface Props {
   onArtifactSaved: (artifact: Artifact) => void
 }
 
+// Tipos de artefato que vão para a wiki (HU por enquanto; HT quando for adicionado)
+const WIKI_ARTIFACT_TYPES = ['historia']
+
 export default function WikiSyncModal({
   gitlabProjectPath,
   projectId,
@@ -18,6 +21,10 @@ export default function WikiSyncModal({
   onClose,
   onArtifactSaved,
 }: Props) {
+  // Pasta local do clone git da wiki
+  const wikiPath = projectFolderPath + '/.wiki'
+  // Apenas artefatos dos tipos permitidos (HU, futuramente HT)
+  const wikiArtifacts = localArtifacts.filter((a) => WIKI_ARTIFACT_TYPES.includes(a.type))
   const [cloned, setCloned]       = useState<boolean | null>(null)
   const [cloning, setCloning]     = useState(false)
   const [status, setStatus]       = useState('')
@@ -139,15 +146,16 @@ export default function WikiSyncModal({
     try {
       const content = await api.wikiGit.readPage(projectFolderPath, filename)
       const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
-      const existing = localArtifacts.find(
+      const existing = wikiArtifacts.find(
         (a) => a.title.toLowerCase() === title.toLowerCase(),
       )
       if (existing) {
         await api.artifactsUpdate(existing.id, content)
         onArtifactSaved({ ...existing })
       } else {
+        // Salva o artefato dentro de .wiki/ — mesma pasta do clone git
         const artifact = await api.artifactsCreate(
-          projectId, 'historia', title, content, projectFolderPath,
+          projectId, 'historia', title, content, wikiPath,
         )
         onArtifactSaved(artifact)
       }
@@ -343,7 +351,7 @@ export default function WikiSyncModal({
             <div className="wiki-git-pages-list">
               {pages.map((filename) => {
                 const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
-                const hasArtifact = localArtifacts.some(
+                const hasArtifact = wikiArtifacts.some(
                   (a) => a.title.toLowerCase() === title.toLowerCase(),
                 )
                 return (
