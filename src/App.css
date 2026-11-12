@@ -3100,15 +3100,17 @@ html, body, #root { height: 100%; overflow: hidden; }
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  margin-bottom: 8px;
-  background: #fff8f0;
-  border: 1px solid #f0b429;
+  margin-bottom: 6px;
+  background: var(--gray-bg);
+  border: 1px solid var(--gray-bdr);
   border-radius: 6px;
   font-size: 12px;
-  color: #92400e;
 }
-.wiki-sync-row-home {
-  background: #f8f8ff;
+.wiki-sync-summary { color: var(--text-secondary); }
+.wiki-sync-hint {
+  font-size: 11px;
+  color: var(--gray-mute);
+  padding: 4px 2px 8px;
 }
 
 .sidebar-list {
