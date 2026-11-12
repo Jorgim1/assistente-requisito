@@ -138,6 +138,21 @@ export default function GlobalChatPanel({
     if (activeProject?.name) metaParts.push(`Projeto: ${activeProject.name}`)
     if (activeProject?.gitlabProjectPath) metaParts.push(`GitLab: ${activeProject.gitlabProjectPath}`)
 
+    // Histórico de conversa — kiro-cli não mantém estado entre turnos,
+    // então incluímos os turnos anteriores no próprio prompt.
+    // `messages` aqui ainda não inclui a mensagem atual (React batching).
+    const prevTurns = messages.filter((m) => !m.system && !m.streaming && m.content.trim())
+    let historyBlock = ''
+    if (prevTurns.length > 0) {
+      // Mantém no máximo os últimos 20 turnos; trunca se passar de 6000 chars
+      const lines = prevTurns.slice(-20).map((m) =>
+        `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.trim()}`
+      )
+      let history = lines.join('\n\n')
+      if (history.length > 6000) history = '…' + history.slice(-6000)
+      historyBlock = `[Histórico da conversa]\n${history}\n\n[Mensagem atual]\n`
+    }
+
     let contextBlock = ''
     if (api && contextArtifacts.length > 0) {
       const parts: string[] = []
@@ -160,7 +175,7 @@ export default function GlobalChatPanel({
     onProcessingChange?.(true)
 
     const metaBlock = metaParts.length > 0 ? metaParts.join('\n') + '\n\n' : ''
-    api?.sendPrompt(metaBlock + contextBlock + text)
+    api?.sendPrompt(metaBlock + contextBlock + historyBlock + text)
   }
 
   const handleSend = async () => {
