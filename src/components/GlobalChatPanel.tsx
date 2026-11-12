@@ -190,7 +190,8 @@ export default function GlobalChatPanel({
     const startW = width
     const onMove = (ev: MouseEvent) => {
       const delta = startX - ev.clientX
-      onWidthChange(Math.max(240, Math.min(640, startW + delta)))
+      const maxW = window.innerWidth - 200
+      onWidthChange(Math.max(240, Math.min(maxW, startW + delta)))
     }
     const onUp = () => {
       window.removeEventListener('mousemove', onMove)
