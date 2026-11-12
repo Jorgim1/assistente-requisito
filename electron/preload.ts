@@ -134,4 +134,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportMd:   (content: string) => ipcRenderer.invoke('derivation:export-md',   content),
     exportHtml: (content: string) => ipcRenderer.invoke('derivation:export-html', content),
   },
+
+  // ── Wiki Git ──────────────────────────────────────────────────
+  wikiGit: {
+    isCloned:  (projectPath: string) => ipcRenderer.invoke('wiki:is-cloned', projectPath) as Promise<boolean>,
+    setup:     (gitlabProjectPath: string, projectPath: string) => ipcRenderer.invoke('wiki:setup', gitlabProjectPath, projectPath) as Promise<void>,
+    pull:      (projectPath: string) => ipcRenderer.invoke('wiki:pull', projectPath) as Promise<string>,
+    push:      (projectPath: string) => ipcRenderer.invoke('wiki:push', projectPath) as Promise<string>,
+    status:    (projectPath: string) => ipcRenderer.invoke('wiki:status', projectPath) as Promise<string>,
+    diff:      (projectPath: string, file?: string) => ipcRenderer.invoke('wiki:diff', projectPath, file) as Promise<string>,
+    log:       (projectPath: string, limit?: number) => ipcRenderer.invoke('wiki:log', projectPath, limit) as Promise<string>,
+    commit:    (projectPath: string, message: string) => ipcRenderer.invoke('wiki:commit', projectPath, message) as Promise<string>,
+    listPages: (projectPath: string) => ipcRenderer.invoke('wiki:list-pages', projectPath) as Promise<string[]>,
+    readPage:  (projectPath: string, filename: string) => ipcRenderer.invoke('wiki:read-page', projectPath, filename) as Promise<string>,
+    writePage: (projectPath: string, filename: string, content: string) => ipcRenderer.invoke('wiki:write-page', projectPath, filename, content) as Promise<void>,
+  },
 })

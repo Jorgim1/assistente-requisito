@@ -178,6 +178,21 @@ export interface ElectronAPI {
     exportMd:   (content: string) => Promise<boolean>
     exportHtml: (content: string) => Promise<boolean>
   }
+
+  // Wiki Git
+  wikiGit: {
+    isCloned:  (projectPath: string) => Promise<boolean>
+    setup:     (gitlabProjectPath: string, projectPath: string) => Promise<void>
+    pull:      (projectPath: string) => Promise<string>
+    push:      (projectPath: string) => Promise<string>
+    status:    (projectPath: string) => Promise<string>
+    diff:      (projectPath: string, file?: string) => Promise<string>
+    log:       (projectPath: string, limit?: number) => Promise<string>
+    commit:    (projectPath: string, message: string) => Promise<string>
+    listPages: (projectPath: string) => Promise<string[]>
+    readPage:  (projectPath: string, filename: string) => Promise<string>
+    writePage: (projectPath: string, filename: string, content: string) => Promise<void>
+  }
 }
 
 declare global {

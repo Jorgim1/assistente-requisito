@@ -1,6 +1,6 @@
 {
   "name": "assistente-requisito",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Assistente de Requisitos — criação, derivação e validação de histórias",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -23,6 +23,12 @@
       "dist/**",
       "dist-electron/**",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/wiki-git-mcp.mjs",
+        "to": "wiki-git-mcp.mjs"
+      }
     ],
     "win": {
       "target": "nsis",

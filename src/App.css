@@ -4623,4 +4623,285 @@ html, body, #root { height: 100%; overflow: hidden; }
 .ready-model-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ready-at-hint { font-size: 11px; color: #2e7d32; font-weight: 600; }
+
+/* ── Wiki Git Modal ──────────────────────────────────────────────── */
+.wiki-git-card {
+  width: 640px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wiki-git-card--main {
+  gap: 0;
+}
+.wiki-git-project {
+  font-size: 11px;
+  color: var(--gray-mute);
+  margin-bottom: 4px;
+}
+.wiki-git-loading {
+  color: var(--gray-mute);
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+}
+.wiki-git-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-light);
+  border: 1px solid var(--red-mid);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+/* Setup panel */
+.wiki-git-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0 8px;
+}
+.wiki-git-setup-desc {
+  font-size: 13px;
+  color: var(--gray-text);
+  line-height: 1.5;
+}
+.wiki-git-setup-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 4px;
+}
+.wiki-git-setup-list li {
+  font-size: 12px;
+  color: var(--gray-mute);
+}
+.wiki-git-clone-btn {
+  align-self: flex-start;
+  padding: 9px 20px;
+  background: var(--red);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+.wiki-git-clone-btn:hover:not(:disabled) { background: var(--red-hover); }
+.wiki-git-clone-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Header (cloned state) */
+.wiki-git-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.wiki-git-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wiki-git-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.wiki-git-badge--clean {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-bdr);
+}
+.wiki-git-badge--dirty {
+  background: var(--yellow-bg);
+  color: var(--yellow);
+  border: 1px solid var(--yellow-bdr);
+}
+
+/* Action buttons */
+.wiki-git-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.wiki-git-action-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--gray-bdr);
+  border-radius: var(--radius);
+  background: var(--gray-bg);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--gray-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.wiki-git-action-btn:hover:not(:disabled) { background: var(--gray-bdr); }
+.wiki-git-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wiki-git-action-btn--pull  { color: var(--blue-dark); border-color: #c0d0f0; background: #f0f4ff; }
+.wiki-git-action-btn--pull:hover:not(:disabled)  { background: #d8e4ff; }
+.wiki-git-action-btn--push  { color: var(--green); border-color: var(--green-bdr); background: var(--green-bg); }
+.wiki-git-action-btn--push:hover:not(:disabled)  { background: #c8f0d8; }
+.wiki-git-action-btn--commit { color: var(--gray-dark); border-color: var(--gray-bdr); }
+.wiki-git-action-btn--log   {}
+.wiki-git-action-btn--diff  {}
+
+/* Sections */
+.wiki-git-section {
+  border-top: 1px solid var(--gray-bdr);
+  padding: 10px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wiki-git-section--pages {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.wiki-git-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wiki-git-pages-hint {
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  color: var(--gray-mute);
+  letter-spacing: 0;
+}
+
+/* Status preview */
+.wiki-git-status-preview {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gray-mute);
+  background: var(--gray-bg);
+  border: 1px solid var(--gray-bdr);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  white-space: pre;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+/* Commit row */
+.wiki-git-commit-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.wiki-git-commit-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--gray-bdr);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: var(--sans);
+  color: var(--gray-text);
+  background: white;
+  outline: none;
+}
+.wiki-git-commit-input:focus { border-color: var(--red); }
+.wiki-git-commit-input::placeholder { color: var(--gray-mute); }
+
+/* Log / Diff */
+.wiki-git-log,
+.wiki-git-diff {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gray-text);
+  background: var(--gray-bg);
+  border: 1px solid var(--gray-bdr);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  white-space: pre;
+  overflow: auto;
+  max-height: 160px;
+}
+
+/* Pages list */
+.wiki-git-pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.wiki-git-page-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.wiki-git-page-row:hover { background: var(--gray-bg); }
+.wiki-git-page-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--gray-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wiki-git-page-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  min-width: 44px;
+  text-align: right;
+}
+.wiki-git-import-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--gray-bdr);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--gray-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.wiki-git-import-btn:hover:not(:disabled) { background: var(--gray-bg); border-color: var(--red); color: var(--red); }
+.wiki-git-import-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wiki-git-empty { font-size: 12px; color: var(--gray-mute); }
+
+/* Hint footer */
+.wiki-git-hint {
+  font-size: 11px;
+  color: var(--gray-mute);
+  background: var(--yellow-bg);
+  border: 1px solid var(--yellow-bdr);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  margin-top: 8px;
+}
 .ready-output  { max-height: 600px; }

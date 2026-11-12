@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import type { WikiPage, Artifact } from '../electron'
+import type { Artifact } from '../electron'
 
 interface Props {
   gitlabProjectPath: string
@@ -10,40 +10,6 @@ interface Props {
   onArtifactSaved: (artifact: Artifact) => void
 }
 
-type SyncStatus = 'loading' | 'synced' | 'diverged' | 'local-only' | 'wiki-only'
-
-interface SyncItem {
-  title: string
-  status: SyncStatus
-  slug?: string
-  artifact?: Artifact
-  localContent?: string
-  wikiContent?: string
-}
-
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-const STATUS_LABEL: Record<SyncStatus, string> = {
-  loading:      '…',
-  synced:       '✅ Sincronizado',
-  diverged:     '⚠ Desatualizado',
-  'local-only': '🖥 Apenas local',
-  'wiki-only':  '☁ Apenas na wiki',
-}
-const STATUS_CLS: Record<SyncStatus, string> = {
-  loading:      'sync-status-loading',
-  synced:       'sync-status-synced',
-  diverged:     'sync-status-diverged',
-  'local-only': 'sync-status-local',
-  'wiki-only':  'sync-status-wiki',
-}
-
 export default function WikiSyncModal({
   gitlabProjectPath,
   projectId,
@@ -52,258 +18,364 @@ export default function WikiSyncModal({
   onClose,
   onArtifactSaved,
 }: Props) {
-  const [items, setItems]           = useState<SyncItem[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState<string | null>(null)
-  const [busy, setBusy]             = useState<string | null>(null)
-  const [downloading, setDownloading] = useState(false)
-  const [dlProgress, setDlProgress] = useState('')
+  const [cloned, setCloned]       = useState<boolean | null>(null)
+  const [cloning, setCloning]     = useState(false)
+  const [status, setStatus]       = useState('')
+  const [pages, setPages]         = useState<string[]>([])
+  const [log, setLog]             = useState('')
+  const [diff, setDiff]           = useState('')
+  const [commitMsg, setCommitMsg] = useState('')
+  const [busy, setBusy]           = useState('')
+  const [error, setError]         = useState('')
+  const [showLog, setShowLog]     = useState(false)
+  const [showDiff, setShowDiff]   = useState(false)
 
-  useEffect(() => { load() }, [gitlabProjectPath])
+  const api = window.electronAPI!
 
-  async function load() {
-    setLoading(true)
-    setError(null)
+  useEffect(() => { checkCloned() }, [])
+
+  async function checkCloned() {
+    setCloned(null)
+    setError('')
     try {
-      const api = window.electronAPI!
-      const wikiPages: WikiPage[] = await api.gitlab.wikiList(gitlabProjectPath)
-
-      const wikiBySlug = new Map<string, WikiPage>()
-      for (const p of wikiPages) {
-        wikiBySlug.set(p.slug,           p)
-        wikiBySlug.set(slugify(p.title), p)
-      }
-
-      const localBySlug = new Map<string, Artifact>()
-      for (const a of localArtifacts) {
-        localBySlug.set(slugify(a.title), a)
-      }
-
-      const allKeys = new Set([...wikiBySlug.keys(), ...localBySlug.keys()])
-      const draft: SyncItem[] = []
-      const seen = new Set<string>()
-
-      for (const key of allKeys) {
-        const wiki  = wikiBySlug.get(key)
-        const local = localBySlug.get(key)
-        const title = local?.title ?? wiki?.title ?? key
-        if (seen.has(title)) continue
-        seen.add(title)
-
-        if (wiki && local) {
-          draft.push({ title, slug: wiki.slug, artifact: local, status: 'loading' })
-        } else if (local) {
-          draft.push({ title, artifact: local, status: 'local-only' })
-        } else if (wiki) {
-          draft.push({ title, slug: wiki.slug, status: 'wiki-only' })
-        }
-      }
-
-      setItems(draft)
-      setLoading(false)
-
-      // Compara conteúdo dos itens com correspondência em ambos os lados
-      for (const item of draft.filter((i) => i.status === 'loading')) {
-        const [wikiPage, localContent] = await Promise.all([
-          api.gitlab.wikiGet(gitlabProjectPath, item.slug!),
-          item.artifact ? api.artifactsRead(item.artifact.id).catch(() => '') : Promise.resolve(''),
-        ])
-        const wikiContent = wikiPage?.content ?? ''
-        const status: SyncStatus = localContent.trim() === wikiContent.trim() ? 'synced' : 'diverged'
-        setItems((prev) =>
-          prev.map((i) => i.title === item.title ? { ...i, status, localContent, wikiContent } : i)
-        )
-      }
-    } catch (err: unknown) {
-      setError((err as Error)?.message ?? 'Erro ao carregar wiki')
-      setLoading(false)
+      const isCloned = await api.wikiGit.isCloned(projectFolderPath)
+      setCloned(isCloned)
+      if (isCloned) await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+      setCloned(false)
     }
   }
 
-  // Baixa TODAS as páginas da wiki como artefatos locais
-  async function handleDownloadAll() {
-    setDownloading(true)
-    const api = window.electronAPI!
+  async function loadAll() {
     try {
-      const pages = items.filter((i) => i.slug)
-      for (let idx = 0; idx < pages.length; idx++) {
-        const item = pages[idx]
-        setDlProgress(`Baixando ${idx + 1}/${pages.length}: ${item.title}`)
-        const full = await api.gitlab.wikiGet(gitlabProjectPath, item.slug!)
-        if (!full?.content) continue
+      const [s, p, l] = await Promise.all([
+        api.wikiGit.status(projectFolderPath),
+        api.wikiGit.listPages(projectFolderPath),
+        api.wikiGit.log(projectFolderPath, 8),
+      ])
+      setStatus(s)
+      setPages(p)
+      setLog(l)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
 
-        if (item.artifact) {
-          await api.artifactsUpdate(item.artifact.id, full.content)
-          onArtifactSaved({ ...item.artifact })
-        } else {
-          const artifact = await api.artifactsCreate(
-            projectId, 'historia', item.title, full.content, projectFolderPath,
-          )
-          onArtifactSaved(artifact)
-        }
-
-        setItems((prev) =>
-          prev.map((i) =>
-            i.title === item.title
-              ? { ...i, status: 'synced', wikiContent: full.content, localContent: full.content }
-              : i
-          )
-        )
-      }
+  async function handleClone() {
+    setCloning(true)
+    setError('')
+    try {
+      await api.wikiGit.setup(gitlabProjectPath, projectFolderPath)
+      setCloned(true)
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
     } finally {
-      setDownloading(false)
-      setDlProgress('')
+      setCloning(false)
     }
   }
 
-  // Envia artefato local para wiki (push direto, sem AI)
-  async function handlePush(item: SyncItem) {
-    setBusy(item.title)
+  async function handlePull() {
+    setBusy('pull')
+    setError('')
     try {
-      const api = window.electronAPI!
-      const content = item.localContent
-        ?? (item.artifact ? await api.artifactsRead(item.artifact.id).catch(() => '') : '')
-      if (item.slug) {
-        await api.gitlab.wikiUpdate(gitlabProjectPath, item.slug, content, item.title)
-      } else {
-        await api.gitlab.wikiCreate(gitlabProjectPath, item.title, content)
-      }
-      setItems((prev) =>
-        prev.map((i) => i.title === item.title ? { ...i, status: 'synced', wikiContent: content } : i)
+      await api.wikiGit.pull(projectFolderPath)
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function handlePush() {
+    setBusy('push')
+    setError('')
+    try {
+      await api.wikiGit.push(projectFolderPath)
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function handleCommit() {
+    if (!commitMsg.trim()) return
+    setBusy('commit')
+    setError('')
+    try {
+      await api.wikiGit.commit(projectFolderPath, commitMsg)
+      setCommitMsg('')
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function handleCommitAndPush() {
+    if (!commitMsg.trim()) return
+    setBusy('commit-push')
+    setError('')
+    try {
+      await api.wikiGit.commit(projectFolderPath, commitMsg)
+      await api.wikiGit.push(projectFolderPath)
+      setCommitMsg('')
+      await loadAll()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function handleImportPage(filename: string) {
+    setBusy(`import-${filename}`)
+    setError('')
+    try {
+      const content = await api.wikiGit.readPage(projectFolderPath, filename)
+      const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
+      const existing = localArtifacts.find(
+        (a) => a.title.toLowerCase() === title.toLowerCase(),
       )
-    } catch (err) {
-      console.error('Erro ao enviar para wiki:', err)
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  // Importa página da wiki como artefato local
-  async function handlePull(item: SyncItem) {
-    setBusy(item.title)
-    try {
-      const api  = window.electronAPI!
-      const full = await api.gitlab.wikiGet(gitlabProjectPath, item.slug!)
-      if (!full?.content) return
-
-      if (item.artifact) {
-        await api.artifactsUpdate(item.artifact.id, full.content)
-        onArtifactSaved({ ...item.artifact })
+      if (existing) {
+        await api.artifactsUpdate(existing.id, content)
+        onArtifactSaved({ ...existing })
       } else {
         const artifact = await api.artifactsCreate(
-          projectId, 'historia', item.title, full.content, projectFolderPath,
+          projectId, 'historia', title, content, projectFolderPath,
         )
         onArtifactSaved(artifact)
       }
-      setItems((prev) =>
-        prev.map((i) =>
-          i.title === item.title
-            ? { ...i, status: 'synced', localContent: full.content, wikiContent: full.content }
-            : i
-        )
-      )
-    } catch (err) {
-      console.error('Erro ao importar da wiki:', err)
+    } catch (e) {
+      setError((e as Error).message)
     } finally {
-      setBusy(null)
+      setBusy('')
     }
   }
 
-  const isBusy = busy !== null || downloading
-  const wikiOnlyCount  = items.filter((i) => i.status === 'wiki-only').length
-  const localOnlyCount = items.filter((i) => i.status === 'local-only').length
-  const divergedCount  = items.filter((i) => i.status === 'diverged').length
+  async function handleShowDiff() {
+    if (!showDiff) {
+      try {
+        const d = await api.wikiGit.diff(projectFolderPath)
+        setDiff(d || '(nenhuma diferença pendente)')
+      } catch (e) {
+        setDiff((e as Error).message)
+      }
+    }
+    setShowDiff(!showDiff)
+  }
 
+  const isBusy      = !!busy || cloning
+  const isDirty     = status.trim().length > 0
+  const statusClean = !isDirty
+
+  // ── Render: carregando ──────────────────────────────────────────
+  if (cloned === null) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-card wiki-git-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-title">Wiki Git</div>
+          <p className="wiki-git-loading">Verificando repositório…</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render: setup (não clonado) ─────────────────────────────────
+  if (!cloned) {
+    return (
+      <div className="modal-overlay" onClick={isBusy ? undefined : onClose}>
+        <div className="modal-card wiki-git-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-title">Wiki Git — Configurar</div>
+          <p className="wiki-git-project">{gitlabProjectPath}</p>
+
+          <div className="wiki-git-setup">
+            <p className="wiki-git-setup-desc">
+              Clone o repositório git da wiki para habilitar sincronização completa:
+              diff, log, commit, push e pull — e ferramentas MCP para o chat usar.
+            </p>
+            <ul className="wiki-git-setup-list">
+              <li>⬇ Baixar todas as páginas da wiki</li>
+              <li>⬆ Enviar alterações locais com commit</li>
+              <li>📄 Importar páginas como artefatos</li>
+              <li>🤖 IA acessa a wiki via chat (MCP)</li>
+            </ul>
+            {error && <p className="wiki-git-error">{error}</p>}
+            <button
+              className="wiki-git-clone-btn"
+              onClick={handleClone}
+              disabled={isBusy}
+            >
+              {cloning ? <><span className="spin-icon">⟳</span> Clonando…</> : '🔗 Clonar Wiki'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <button className="modal-btn-cancel" onClick={onClose} disabled={isBusy}>Fechar</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render: painel git ──────────────────────────────────────────
   return (
     <div className="modal-overlay" onClick={isBusy ? undefined : onClose}>
-      <div className="modal-card wiki-sync-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Sincronizar Wiki</div>
-        <p className="wiki-modal-project">{gitlabProjectPath}</p>
+      <div className="modal-card wiki-git-card wiki-git-card--main" onClick={(e) => e.stopPropagation()}>
 
-        {downloading && (
-          <div className="wiki-sync-ai-status">
-            <span className="spin-icon">⟳</span> {dlProgress || 'Baixando…'}
+        {/* Cabeçalho */}
+        <div className="wiki-git-header">
+          <div>
+            <div className="modal-title" style={{ marginBottom: 2 }}>Wiki Git</div>
+            <p className="wiki-git-project">{gitlabProjectPath}</p>
+          </div>
+          <div className="wiki-git-header-actions">
+            <span className={`wiki-git-badge ${statusClean ? 'wiki-git-badge--clean' : 'wiki-git-badge--dirty'}`}>
+              {statusClean ? '✅ Limpa' : `⚠ ${status.trim().split('\n').length} mod.`}
+            </span>
+            <button className="wiki-git-action-btn" onClick={() => loadAll()} disabled={isBusy} title="Atualizar status">
+              {busy === '' ? '🔄' : <span className="spin-icon">⟳</span>}
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="wiki-git-error">{error}</p>}
+
+        {/* Ações principais */}
+        <div className="wiki-git-actions">
+          <button
+            className="wiki-git-action-btn wiki-git-action-btn--pull"
+            onClick={handlePull}
+            disabled={isBusy}
+            title="git pull --rebase"
+          >
+            {busy === 'pull' ? <span className="spin-icon">⟳</span> : '⬇'} Pull
+          </button>
+          <button
+            className="wiki-git-action-btn wiki-git-action-btn--push"
+            onClick={handlePush}
+            disabled={isBusy || isDirty}
+            title={isDirty ? 'Commite as alterações antes de fazer push' : 'git push'}
+          >
+            {busy === 'push' ? <span className="spin-icon">⟳</span> : '⬆'} Push
+          </button>
+          <button
+            className="wiki-git-action-btn wiki-git-action-btn--log"
+            onClick={() => setShowLog(!showLog)}
+            title="Histórico de commits"
+          >
+            📋 Log {showLog ? '▲' : '▼'}
+          </button>
+          <button
+            className="wiki-git-action-btn wiki-git-action-btn--diff"
+            onClick={handleShowDiff}
+            disabled={isBusy}
+            title="Ver diferenças pendentes"
+          >
+            🔍 Diff {showDiff ? '▲' : '▼'}
+          </button>
+        </div>
+
+        {/* Log */}
+        {showLog && (
+          <div className="wiki-git-section">
+            <div className="wiki-git-section-title">Histórico</div>
+            <pre className="wiki-git-log">{log || '(sem commits)'}</pre>
           </div>
         )}
 
-        {loading && <p className="wiki-modal-status">Carregando páginas…</p>}
-        {error   && <p className="wiki-modal-error">{error}</p>}
-
-        {!loading && !error && items.length === 0 && (
-          <p className="wiki-modal-status">Nenhuma página encontrada.</p>
+        {/* Diff */}
+        {showDiff && (
+          <div className="wiki-git-section">
+            <div className="wiki-git-section-title">Diferenças pendentes</div>
+            <pre className="wiki-git-diff">{diff}</pre>
+          </div>
         )}
 
-        {!loading && !error && items.length > 0 && (
-          <>
-            {/* Barra de ações em lote */}
-            <div className="wiki-sync-batch-bar">
-              <span className="wiki-sync-summary">
-                {wikiOnlyCount > 0  && `${wikiOnlyCount} só na wiki  `}
-                {localOnlyCount > 0 && `${localOnlyCount} só local  `}
-                {divergedCount  > 0 && `${divergedCount} desatualizado`}
-                {wikiOnlyCount + localOnlyCount + divergedCount === 0 && '✅ Tudo sincronizado'}
-              </span>
-              {wikiOnlyCount + divergedCount > 0 && (
-                <button
-                  className="wiki-sync-btn wiki-sync-btn-pull"
-                  disabled={isBusy}
-                  onClick={handleDownloadAll}
-                  title="Baixa todas as páginas da wiki como artefatos locais"
-                >
-                  ⬇ Baixar tudo da wiki
-                </button>
-              )}
+        {/* Commit */}
+        {isDirty && (
+          <div className="wiki-git-section">
+            <div className="wiki-git-section-title">Commitar alterações</div>
+            <div className="wiki-git-status-preview">{status}</div>
+            <div className="wiki-git-commit-row">
+              <input
+                className="wiki-git-commit-input"
+                placeholder="Mensagem do commit…"
+                value={commitMsg}
+                onChange={(e) => setCommitMsg(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleCommit() }}
+                disabled={isBusy}
+              />
+              <button
+                className="wiki-git-action-btn wiki-git-action-btn--commit"
+                onClick={handleCommit}
+                disabled={isBusy || !commitMsg.trim()}
+                title="git add -A && git commit"
+              >
+                {busy === 'commit' ? <span className="spin-icon">⟳</span> : '✓'} Commit
+              </button>
+              <button
+                className="wiki-git-action-btn wiki-git-action-btn--push"
+                onClick={handleCommitAndPush}
+                disabled={isBusy || !commitMsg.trim()}
+                title="Commit + push"
+              >
+                {busy === 'commit-push' ? <span className="spin-icon">⟳</span> : '⬆'} Commit+Push
+              </button>
             </div>
-
-            <div className="wiki-sync-hint">
-              💡 Use o <strong>Chat</strong> com as páginas selecionadas para analisar a estrutura e decidir o que publicar.
-            </div>
-
-            <div className="wiki-sync-list">
-              <div className="wiki-sync-header">
-                <span>Título</span>
-                <span>Status</span>
-                <span>Ações</span>
-              </div>
-              {items.map((item) => (
-                <div key={item.title} className="wiki-sync-row">
-                  <span className="wiki-sync-title" title={item.title}>
-                    {item.title.length > 36 ? item.title.slice(0, 36) + '…' : item.title}
-                  </span>
-                  <span className={`wiki-sync-status ${STATUS_CLS[item.status]}`}>
-                    {STATUS_LABEL[item.status]}
-                  </span>
-                  <span className="wiki-sync-actions">
-                    {(item.status === 'local-only' || item.status === 'diverged') && (
-                      <button
-                        className="wiki-sync-btn wiki-sync-btn-push"
-                        disabled={isBusy}
-                        onClick={() => handlePush(item)}
-                        title="Enviar versão local para wiki"
-                      >
-                        {busy === item.title ? '…' : '⬆ Enviar'}
-                      </button>
-                    )}
-                    {(item.status === 'wiki-only' || item.status === 'diverged') && (
-                      <button
-                        className="wiki-sync-btn wiki-sync-btn-pull"
-                        disabled={isBusy}
-                        onClick={() => handlePull(item)}
-                        title="Importar da wiki"
-                      >
-                        {busy === item.title ? '…' : '⬇ Importar'}
-                      </button>
-                    )}
-                    {item.status === 'synced'  && <span className="wiki-sync-ok">—</span>}
-                    {item.status === 'loading' && <span className="wiki-sync-ok">…</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
+          </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+        {/* Páginas */}
+        <div className="wiki-git-section wiki-git-section--pages">
+          <div className="wiki-git-section-title">
+            Páginas ({pages.length})
+            <span className="wiki-git-pages-hint">Clique em Importar para criar um artefato local</span>
+          </div>
+          {pages.length === 0 ? (
+            <p className="wiki-git-empty">Nenhuma página .md encontrada na wiki.</p>
+          ) : (
+            <div className="wiki-git-pages-list">
+              {pages.map((filename) => {
+                const title = filename.replace(/\.md$/, '').replace(/-/g, ' ')
+                const hasArtifact = localArtifacts.some(
+                  (a) => a.title.toLowerCase() === title.toLowerCase(),
+                )
+                return (
+                  <div key={filename} className="wiki-git-page-row">
+                    <span className="wiki-git-page-name" title={filename}>
+                      📄 {title.length > 44 ? title.slice(0, 44) + '…' : title}
+                    </span>
+                    <span className={`wiki-git-page-badge ${hasArtifact ? 'wiki-git-page-badge--local' : ''}`}>
+                      {hasArtifact ? '✓ local' : ''}
+                    </span>
+                    <button
+                      className="wiki-git-import-btn"
+                      onClick={() => handleImportPage(filename)}
+                      disabled={isBusy}
+                      title={hasArtifact ? 'Atualizar artefato com conteúdo da wiki' : 'Importar como artefato'}
+                    >
+                      {busy === `import-${filename}` ? <span className="spin-icon">⟳</span>
+                        : hasArtifact ? '↻ Atualizar' : '⬇ Importar'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Dica do chat */}
+        <div className="wiki-git-hint">
+          💡 Use o <strong>Chat</strong> para analisar e modificar páginas com IA — o MCP wiki-git está disponível.
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
           <button className="modal-btn-cancel" onClick={onClose} disabled={isBusy}>Fechar</button>
         </div>
       </div>
